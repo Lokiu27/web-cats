@@ -31,22 +31,36 @@ function makeAppearance(index: number): CatAppearance {
   };
 }
 
-function makeStarterCat(index: number): Cat {
+const STARTER_BIOS_EN = [
+  'Expert in keyboard napping. 3 years of experience.',
+  'Former mouse hunter, now hunts bugs in code.',
+  'Certified purr-fessional. Specializes in doing nothing.',
+];
+
+const STARTER_BIOS_RU = [
+  'Эксперт по сну на клавиатуре. 3 года опыта.',
+  'Бывший охотник на мышей, теперь ловит баги.',
+  'Сертифицированный мурр-фессионал. Ничего не делает.',
+];
+
+function makeStarterCat(index: number, language: 'en' | 'ru'): Cat {
   const names = ['Whiskers', 'Mittens', 'Shadow'];
+  const bios = language === 'ru' ? STARTER_BIOS_RU : STARTER_BIOS_EN;
   return {
     name: names[index] ?? `Cat ${index + 1}`,
     appearance: makeAppearance(index),
+    biography: bios[index] ?? (language === 'ru' ? 'Загадочный офисный кот.' : 'A mysterious office cat.'),
   };
 }
 
-function makeStarterDesk(index: number): Desk {
+function makeStarterDesk(index: number, language: 'en' | 'ru'): Desk {
   // Place the 3 starter desks: (0,0), (0,1), (0,2) — first column, rows 0-2
   const hexCoord: HexCoord = { q: 0, r: index };
   return {
     id: `desk-starter-${index}`,
     hexCoord,
     upgradeLevel: 0,
-    cat: makeStarterCat(index),
+    cat: makeStarterCat(index, language),
   };
 }
 
@@ -55,8 +69,9 @@ function makeStarterDesk(index: number): Desk {
  * Starts with 3 desks at upgrade level 0 and 150 currency (Requirement 2.6).
  */
 export function createInitialState(): GameState {
+  const language: 'en' | 'ru' = 'en';
   const desks: Desk[] = Array.from({ length: ECONOMY.STARTING_DESKS }, (_, i) =>
-    makeStarterDesk(i),
+    makeStarterDesk(i, language),
   );
 
   return {

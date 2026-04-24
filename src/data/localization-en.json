@@ -52,6 +52,11 @@
   "modal.upgrade.upgrade": "Upgrade",
   "modal.upgrade.close": "Close",
   "modal.upgrade.insufficient": "Not enough currency",
+  "modal.upgrade.max_level": "MAX",
+  "modal.upgrade.level_format": "Level: {level}/3",
+  "modal.upgrade.level_max": "Level: MAX",
+  "modal.upgrade.promoted_message": "Meow! I got promoted!",
+  "modal.upgrade.biography_label": "Bio",
 
   "modal.save_confirm.title": "Game Saved",
   "modal.save_confirm.message": "Your progress has been saved.",

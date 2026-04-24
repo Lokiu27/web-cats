@@ -28,6 +28,7 @@ const HUD_STYLES = `
   border-bottom: 1px solid #333355;
   font-family: 'Courier New', Courier, monospace;
   box-sizing: border-box;
+  pointer-events: auto;
   flex-wrap: wrap;
   user-select: none;
 }

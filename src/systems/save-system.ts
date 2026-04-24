@@ -78,13 +78,26 @@ function migrate(envelope: SaveEnvelope): GameState | null {
  */
 function applyDefaults(partial: Partial<GameState>): GameState {
   const defaults = createInitialState();
-  return {
+  const state: GameState = {
     ...defaults,
     ...partial,
     // Nested objects need explicit merging so we don't lose sub-fields
     settings: { ...defaults.settings, ...(partial.settings ?? {}) },
     statistics: { ...defaults.statistics, ...(partial.statistics ?? {}) },
   };
+
+  // Backfill missing biography for cats in old saves (Requirements: 2.5, 13.5)
+  state.desks = state.desks.map((desk) => {
+    if (!desk.cat.biography) {
+      return {
+        ...desk,
+        cat: { ...desk.cat, biography: 'A mysterious office cat.' },
+      };
+    }
+    return desk;
+  });
+
+  return state;
 }
 
 /**

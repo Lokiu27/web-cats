@@ -62,6 +62,78 @@ const CAT_NAMES_RU: string[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Biography pools (Requirements 2.1, 2.2, 2.3, 2.4)
+// ---------------------------------------------------------------------------
+
+// English office-themed cat biographies — each ≤ 100 characters
+export const CAT_BIOS_EN: string[] = [
+  'Expert in keyboard napping. 3 years of experience.',
+  'Former mouse hunter, now hunts bugs in code.',
+  'Certified purr-fessional. Specializes in doing nothing.',
+  'Fluent in meow and markdown. Prefers meow.',
+  'Holds a degree in Staring Out Windows. Summa cum laude.',
+  'Senior nap engineer with a passion for warm laptops.',
+  'Knocked over 47 coffee cups. Zero regrets.',
+  'Agile practitioner. Mostly agile at avoiding work.',
+  'Full-stack cat. Stacks boxes, papers, and colleagues.',
+  'Productivity consultant. Consults by sitting on keyboards.',
+  'Specialist in deadline avoidance and strategic yawning.',
+  'Onboarded 3 interns. All three now fear Mondays.',
+  'Expert multitasker: naps and ignores emails simultaneously.',
+  'Promoted twice for outstanding fur quality.',
+  'Leads the 3 PM sunbeam optimization committee.',
+  'Pioneered the art of looking busy while sleeping.',
+  'Holds the office record for longest uninterrupted nap.',
+  'Certified in advanced paper-pushing (off desks).',
+  'Mentors junior cats in the art of the slow blink.',
+  'Attended every meeting. Contributed zero actionable items.',
+  'Renowned for strategic inbox zero (by deletion).',
+  'Invented the standing desk nap. Patent pending.',
+  'Fluent in body language. Mostly says "leave me alone".',
+  'Optimized the office snack supply chain. For personal use.',
+  'Chaired the quarterly fur-grooming review board.',
+  'Broke the printer twice. Blamed the intern both times.',
+  'Holds a black belt in passive resistance.',
+  'Authored the company nap policy. Self-enforced.',
+  'Survived 12 reorgs. Outlasted 4 managers.',
+  'Specializes in strategic ambiguity and selective hearing.',
+];
+
+// Russian office-themed cat biographies — each ≤ 100 characters
+export const CAT_BIOS_RU: string[] = [
+  'Эксперт по сну на клавиатуре. 3 года опыта.',
+  'Бывший охотник на мышей, теперь ловит баги.',
+  'Сертифицированный мурр-фессионал. Ничего не делает.',
+  'Свободно владеет мяуканьем и молчанием.',
+  'Степень по созерцанию окна. С отличием.',
+  'Старший инженер по дремоте. Любит тёплые ноутбуки.',
+  'Уронил 47 чашек кофе. Ни о чём не жалеет.',
+  'Практикует agile. В основном уклоняется от задач.',
+  'Фулстек-кот. Складывает коробки, бумаги и коллег.',
+  'Консультант по продуктивности. Сидит на клавиатурах.',
+  'Специалист по избеганию дедлайнов и стратегической зевоте.',
+  'Обучил 3 стажёров. Все трое боятся понедельников.',
+  'Мастер многозадачности: спит и игнорирует письма.',
+  'Повышен дважды за выдающееся качество шерсти.',
+  'Возглавляет комитет по оптимизации солнечных пятен.',
+  'Освоил искусство выглядеть занятым во сне.',
+  'Рекордсмен офиса по длительности непрерывного сна.',
+  'Сертифицирован по продвинутому сталкиванию бумаг со стола.',
+  'Наставник молодых котов в искусстве медленного моргания.',
+  'Посетил все совещания. Внёс ноль полезных идей.',
+  'Известен стратегическим обнулением входящих (удалением).',
+  'Изобрёл дрёму за стоячим столом. Патент на рассмотрении.',
+  'Владеет языком тела. В основном говорит «не трогай».',
+  'Оптимизировал офисные запасы снеков. Для личных нужд.',
+  'Председатель ежеквартального совета по уходу за шерстью.',
+  'Сломал принтер дважды. Оба раза обвинил стажёра.',
+  'Чёрный пояс по пассивному сопротивлению.',
+  'Автор корпоративной политики дремоты. Сам и соблюдает.',
+  'Пережил 12 реорганизаций. Пережил 4 руководителей.',
+  'Специализируется на стратегической неопределённости.',
+];
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -124,5 +196,19 @@ export class CatGenerator implements ICatAppearanceGenerator {
       }
       suffix++;
     }
+  }
+
+  /**
+   * Picks a random biography from the language-appropriate biography pool.
+   *
+   * Each biography is an office-themed phrase of at most 100 characters.
+   *
+   * Requirements 2.1, 2.2, 2.3, 2.4, 2.6
+   *
+   * @param language - Language code for the biography pool ('en' | 'ru')
+   */
+  generateBiography(language: 'en' | 'ru'): string {
+    const pool = language === 'ru' ? CAT_BIOS_RU : CAT_BIOS_EN;
+    return pick(pool);
   }
 }

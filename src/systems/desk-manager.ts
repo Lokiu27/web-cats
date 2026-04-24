@@ -22,6 +22,7 @@ import type {
   UpgradeResult,
 } from '../types/index.js';
 import type { ICatAppearanceGenerator } from '../types/index.js';
+import { ECONOMY } from '../data/economy.js';
 
 // ---------------------------------------------------------------------------
 // Hex placement helpers
@@ -148,12 +149,13 @@ export class DeskManager implements IDeskManager {
     const existingNames = state.desks.map(d => d.cat.name);
     const appearance = this.catGenerator.generate();
     const name = this.catGenerator.generateName(existingNames, state.settings.language);
+    const biography = this.catGenerator.generateBiography(state.settings.language);
 
     const desk: Desk = {
       id: `desk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       hexCoord,
       upgradeLevel: 0,
-      cat: { name, appearance },
+      cat: { name, appearance, biography },
     };
 
     const newCurrency = state.currency - cost;
@@ -192,6 +194,12 @@ export class DeskManager implements IDeskManager {
     }
 
     const desk = state.desks[deskIndex];
+
+    // Requirement 5.1, 5.4: reject if desk is already at max level
+    if (desk.upgradeLevel >= ECONOMY.MAX_UPGRADE_LEVEL) {
+      return { success: false, error: 'max_level_reached' };
+    }
+
     const cost = this.economy.getUpgradeCost(desk.upgradeLevel);
 
     // Requirement 3.5: reject if insufficient currency

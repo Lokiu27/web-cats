@@ -218,7 +218,13 @@ export class SettingsScreen {
     backBtn.className = 'settings__back-btn';
     backBtn.setAttribute('type', 'button');
     backBtn.textContent = localization.t('ui.back');
-    backBtn.addEventListener('click', () => this.onBack());
+    backBtn.style.pointerEvents = 'auto';
+    backBtn.style.position = 'relative';
+    backBtn.style.zIndex = '9999';
+    backBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.onBack();
+    });
 
     const title = document.createElement('div');
     title.className = 'settings__title';

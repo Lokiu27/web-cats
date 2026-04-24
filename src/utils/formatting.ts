@@ -31,7 +31,21 @@ export function formatCurrency(value: number): string {
     }
   }
 
+  // For values < 1000: always show as integer (used for currency balances)
   return Math.floor(value).toString();
+}
+
+/**
+ * Formats a generation rate value, preserving up to 2 decimal places.
+ * Unlike formatCurrency, this shows fractional values (e.g., "1.25", "0.25").
+ *
+ * @param value - Generation rate to format
+ * @returns Formatted string with up to 2 decimals
+ */
+export function formatGeneration(value: number): string {
+  if (value === 0) return '0';
+  const fixed = value.toFixed(2).replace(/\.?0+$/, '');
+  return fixed;
 }
 
 /**

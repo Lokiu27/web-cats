@@ -52,6 +52,11 @@
   "modal.upgrade.upgrade": "Улучшить",
   "modal.upgrade.close": "Закрыть",
   "modal.upgrade.insufficient": "Недостаточно валюты",
+  "modal.upgrade.max_level": "МАКС",
+  "modal.upgrade.level_format": "Уровень: {level}/3",
+  "modal.upgrade.level_max": "Уровень: МАКС",
+  "modal.upgrade.promoted_message": "Мяу! Меня повысили!",
+  "modal.upgrade.biography_label": "Био",
 
   "modal.save_confirm.title": "Игра сохранена",
   "modal.save_confirm.message": "Ваш прогресс сохранён.",

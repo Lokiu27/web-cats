@@ -172,6 +172,10 @@ const SFX_DEFS: Record<SFXType, SFXDef> = {
     type: 'triangle', freqStart: 1047, freqEnd: 1047,
     duration: 0.05, attack: 0.005, decay: 0.04, gain: 0.15,
   },
+  meow: {
+    type: 'sine', freqStart: 800, freqEnd: 600,
+    duration: 0.3, attack: 0.02, decay: 0.26, gain: 0.3,
+  },
 };
 
 // ---------------------------------------------------------------------------

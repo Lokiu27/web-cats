@@ -26,6 +26,8 @@ import { localization } from './systems/localization.js';
 
 import { HexGridRenderer } from './rendering/hex-grid-renderer.js';
 import { PixelArtGenerator } from './rendering/pixel-art-generator.js';
+import { SpriteLoader } from './rendering/sprite-loader.js';
+import { SpritesheetRenderer } from './rendering/spritesheet-renderer.js';
 import { VisualEffects } from './rendering/visual-effects.js';
 
 import { AudioSystem } from './audio/audio-system.js';
@@ -47,6 +49,7 @@ import { AchievementNotification } from './ui/modals/achievement-notification.js
 
 import type { HexCoord, ScreenType, Viewport } from './types/index.js';
 import { ACHIEVEMENT_DEFINITIONS } from './data/achievements.js';
+import { ECONOMY } from './data/economy.js';
 
 // ---------------------------------------------------------------------------
 // DOM elements
@@ -92,6 +95,7 @@ canvas.height = GAME_H;
 
 // Rendering
 const pixelArt = new PixelArtGenerator();
+const spriteLoader = new SpriteLoader();
 
 const initialViewport: Viewport = {
   offsetX: 0,
@@ -100,8 +104,26 @@ const initialViewport: Viewport = {
   scale: 1,
   parallaxLayers: [0.3, 0.6, 1.0],
 };
-const hexRenderer = new HexGridRenderer(initialViewport, pixelArt);
-const visualEffects = new VisualEffects(pixelArt);
+
+// Start with PixelArtGenerator so the game is immediately playable with
+// procedural graphics. After high-priority sprites load, swap to
+// SpritesheetRenderer (Req 6.2, 8.5).
+let hexRenderer = new HexGridRenderer(initialViewport, pixelArt);
+let visualEffects = new VisualEffects(pixelArt);
+
+// Async IIFE: load high-priority sprites, then upgrade renderers to use
+// SpritesheetRenderer. Low-priority cat sprites continue loading in the
+// background without blocking the game (Req 8.1, 8.5).
+(async () => {
+  try {
+    await spriteLoader.loadAll(); // awaits high-priority sprites; starts bg load of low-priority
+    const spritesheetRenderer = new SpritesheetRenderer(spriteLoader, pixelArt);
+    hexRenderer = new HexGridRenderer(hexRenderer.getViewport(), spritesheetRenderer);
+    visualEffects = new VisualEffects(spritesheetRenderer);
+  } catch (err) {
+    console.warn('[SpriteSystem] Failed to load sprites, continuing with procedural graphics:', err);
+  }
+})();
 
 // Audio
 const audioSystem = new AudioSystem();
@@ -152,7 +174,9 @@ screenRouter.registerScreen('about', aboutScreen.element);
  */
 function buildGameScreen(): HTMLDivElement {
   const gameScreen = document.createElement('div');
-  gameScreen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;';
+  // pointer-events: none so clicks pass through to the canvas underneath.
+  // Child elements (HUD, modals) re-enable pointer-events on themselves.
+  gameScreen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;';
 
   // HUD at the top
   gameScreen.appendChild(hud.element);
@@ -248,8 +272,8 @@ timeController.onTick(() => {
     const deskToShow = state.desks[result.playTimeTicks % state.desks.length];
     if (deskToShow) {
       const screen = hexRenderer.hexToScreen(deskToShow.hexCoord);
-      const perDesk = result.generated / state.desks.length;
-      visualEffects.spawnFloatingCurrency(screen.x, screen.y - 20, perDesk);
+      const deskGen = economy.getDeskGeneration(deskToShow.upgradeLevel);
+      visualEffects.spawnFloatingCurrency(screen.x, screen.y - 20, deskGen);
     }
   }
 });
@@ -357,6 +381,13 @@ bus.on('language_changed', (e) => {
   // Rebuild the game screen container with the new component instances
   screenRouter.registerScreen('game', buildGameScreen());
 
+  // Force-show the current screen to cancel any pending navigateTo transitions
+  // that would otherwise remove screen--active from the rebuilt elements.
+  const current = screenRouter.getCurrentScreen();
+  if (current) {
+    screenRouter.showImmediate(current);
+  }
+
   // Re-wire callbacks for rebuilt screens (must run AFTER all rebuilds)
   wireAllCallbacks();
 });
@@ -401,14 +432,25 @@ function wireAllCallbacks(): void {
     const state = stateManager.getState();
     const result = deskManager.upgradeDesk(deskId, state);
     if (result.success && result.newLevel !== undefined && result.newCurrency !== undefined) {
+      // Update state
       const newDesks = state.desks.map(d => d.id === deskId ? { ...d, upgradeLevel: result.newLevel! } : d);
       const highestLevel = Math.max(...newDesks.map(d => d.upgradeLevel));
       stateManager.setState({
-        desks: newDesks, currency: result.newCurrency, totalUpgradeCount: state.totalUpgradeCount + 1,
+        desks: newDesks,
+        currency: result.newCurrency,
+        totalUpgradeCount: state.totalUpgradeCount + 1,
         statistics: { ...state.statistics, highestDeskLevel: Math.max(state.statistics.highestDeskLevel, highestLevel) },
       });
-      upgradeModal.hide();
+
+      // Refresh modal in-place (NOT hide)
+      const updatedDesk = newDesks.find(d => d.id === deskId)!;
+      const isMaxLevel = result.newLevel! >= ECONOMY.MAX_UPGRADE_LEVEL;
+      const newCost = isMaxLevel ? 0 : economy.getUpgradeCost(result.newLevel!);
+      const nextGen = isMaxLevel ? result.newGeneration! : economy.getDeskGeneration(result.newLevel! + 1);
+      upgradeModal.refreshAfterUpgrade(updatedDesk, newCost, result.newCurrency!, economy.getDeskGeneration(result.newLevel!), nextGen);
+      upgradeModal.showPromotionMessage();
       audioSystem.playSFX('upgrade');
+      audioSystem.playSFX('meow');
     } else { audioSystem.playSFX('error'); }
   };
   upgradeModal.onClose = () => { upgradeModal.hide(); audioSystem.playSFX('window_close'); };
@@ -442,7 +484,7 @@ function wireAllCallbacks(): void {
     const state = stateManager.getState();
     const desk = state.desks.find(d => d.hexCoord.q === coord.q && d.hexCoord.r === coord.r);
     if (!desk) return;
-    upgradeModal.show(desk, economy.getUpgradeCost(desk.upgradeLevel), state.currency, economy.getDeskGeneration(desk.upgradeLevel), economy.getDeskGeneration(desk.upgradeLevel + 1));
+    upgradeModal.show(desk, economy.getUpgradeCost(desk.upgradeLevel), state.currency, economy.getDeskGeneration(desk.upgradeLevel), economy.getDeskGeneration(desk.upgradeLevel + 1), hexRenderer.getPixelArt() ?? pixelArt);
     audioSystem.playSFX('window_open');
   };
   inputHandlers.onScroll = () => {};
@@ -495,6 +537,11 @@ function navigateTo(screen: ScreenType): void {
   }
 
   screenRouter.navigateTo(screen);
+
+  // Resume the game when returning to the game screen
+  if (screen === 'game') {
+    timeController.resume();
+  }
 
   // Refresh screens that need live data when shown
   if (screen === 'main_menu') {

@@ -36,7 +36,7 @@ const ROW_STAGGER = CELL_W / 2;
 const LEFT_MARGIN = 80;
 
 /** Front row (row 0) Y position — near the bottom of the 480px canvas. */
-const FRONT_ROW_Y = 420;
+const FRONT_ROW_Y = 390;
 
 /** Upgrade bar dimensions. */
 const UPGRADE_BAR_W = 60;
@@ -51,10 +51,10 @@ const SCROLL_MIN_VELOCITY = 0.5;
 // ---------------------------------------------------------------------------
 
 export function upgradeBarColor(level: number): string {
-  if (level >= 20) return '#ffd700';
-  if (level >= 10) return '#a855f7';
-  if (level >= 5)  return '#3b82f6';
-  return '#22c55e';
+  if (level >= 3) return '#ffd700';  // gold — premium
+  if (level >= 2) return '#a855f7';  // purple — modern
+  if (level >= 1) return '#3b82f6';  // blue — improved
+  return '#22c55e';                   // green — basic
 }
 
 // ---------------------------------------------------------------------------
@@ -96,7 +96,7 @@ function drawFallbackDesk(
   const w = CELL_W * 0.7;
   const h = 30;
   const colors = ['#6a5748', '#0f3460', '#533483', '#ffd700'];
-  const ti = level >= 20 ? 3 : level >= 10 ? 2 : level >= 5 ? 1 : 0;
+  const ti = Math.min(3, Math.max(0, level));  // direct mapping: 0→basic, 1→improved, 2→modern, 3→premium
   ctx.fillStyle = colors[ti];
   ctx.fillRect(cx - w / 2, cy - h / 2 + 10, w, h);
   ctx.strokeStyle = '#000';
@@ -134,7 +134,11 @@ export class HexGridRenderer implements IHexGridRenderer {
   constructor(viewport: Viewport, pixelArt: IPixelArtGenerator | null = null) {
     this.viewport = { ...viewport };
     this.pixelArt = pixelArt;
+    this.bgTile = null; // Force regeneration
   }
+
+  /** Returns the pixel art generator used by this renderer. */
+  getPixelArt(): IPixelArtGenerator | null { return this.pixelArt; }
 
   getViewport(): Viewport { return { ...this.viewport }; }
 
@@ -211,17 +215,11 @@ export class HexGridRenderer implements IHexGridRenderer {
   }
 
   private _makeBgTile(): OffscreenCanvas {
-    if (this.pixelArt) {
-      try { return this.pixelArt.generateBackgroundLayer('floor', 64); } catch { /* fall through */ }
-    }
+    // Simple dark background — no hex grid pattern for empty cells
     const tile = new OffscreenCanvas(64, 64);
     const c = tile.getContext('2d')!;
     c.fillStyle = COLORS.office.floor[1];
     c.fillRect(0, 0, 64, 64);
-    c.strokeStyle = COLORS.office.floor[3];
-    c.lineWidth = 1;
-    for (let x = 0; x < 64; x += 16) { c.beginPath(); c.moveTo(x, 0); c.lineTo(x, 64); c.stroke(); }
-    for (let y = 0; y < 64; y += 16) { c.beginPath(); c.moveTo(0, y); c.lineTo(64, y); c.stroke(); }
     return tile;
   }
 
@@ -235,32 +233,38 @@ export class HexGridRenderer implements IHexGridRenderer {
 
     const tier = this._tier(desk.upgradeLevel);
 
-    // --- Desk sprite (scaled up) ---
-    if (this.pixelArt) {
-      try {
-        const ds = this.pixelArt.generateDeskSprite(tier);
-        const dw = CELL_W * 0.9;
-        const dh = ds.height * (dw / ds.width);
-        ctx.drawImage(ds, cx - dw / 2, cy - dh / 2 + 10, dw, dh);
-        if (tier === 'premium' || tier === 'modern') {
-          const glow = this.pixelArt.generateDeskGlow(tier);
-          ctx.globalAlpha = 0.5;
-          ctx.drawImage(glow, cx - dw / 2, cy - dh / 2 + 10, dw, dh);
-          ctx.globalAlpha = 1;
-        }
-      } catch { drawFallbackDesk(ctx, cx, cy, desk.upgradeLevel); }
-    } else {
-      drawFallbackDesk(ctx, cx, cy, desk.upgradeLevel);
-    }
-
-    // --- Cat sprite (scaled up, sitting above desk) ---
+    // --- Cat sprite (drawn FIRST, desk overlaps bottom part) ---
     if (this.pixelArt) {
       try {
         const cs = this.pixelArt.generateCatSprite(desk.cat.appearance, { action: 'idle', frame: 0 });
         const cw = CELL_W * 0.75;
         const ch = cs.height * (cw / cs.width);
-        ctx.drawImage(cs, cx - cw / 2, cy - ch - 6, cw, ch);
+        // Shifted down and right compared to desk center
+        const catX = cx - cw / 2 + 12;
+        const catY = cy - ch * 0.55;
+
+        ctx.drawImage(cs, catX, catY, cw, ch);
       } catch { drawFallbackCat(ctx, cx, cy); }
+    } else {
+      drawFallbackCat(ctx, cx, cy);
+    }
+
+    // --- Desk sprite (drawn AFTER cat — overlaps cat's lower body) ---
+    if (this.pixelArt) {
+      try {
+        const ds = this.pixelArt.generateDeskSprite(tier);
+        const dw = CELL_W * 0.9;
+        const dh = ds.height * (dw / ds.width);
+        ctx.drawImage(ds, cx - dw / 2, cy - dh / 2 + 18, dw, dh);
+        if (tier === 'premium' || tier === 'modern') {
+          const glow = this.pixelArt.generateDeskGlow(tier);
+          ctx.save();
+          ctx.globalAlpha = 0.35;
+          ctx.globalCompositeOperation = 'lighter';
+          ctx.drawImage(glow, cx - dw / 2, cy - dh / 2 + 18, dw, dh);
+          ctx.restore();
+        }
+      } catch { drawFallbackDesk(ctx, cx, cy, desk.upgradeLevel); }
     } else {
       drawFallbackCat(ctx, cx, cy);
     }
@@ -277,7 +281,18 @@ export class HexGridRenderer implements IHexGridRenderer {
     cx: number, cy: number,
     highlighted: boolean,
   ): void {
-    // Isometric diamond platform
+    if (this.pixelArt) {
+      try {
+        const state = highlighted ? 'highlighted' : 'occupied';
+        const sprite = this.pixelArt.generateHexSprite(state);
+        const sw = CELL_W * 1.3;
+        const sh = sprite.height * (sw / sprite.width);
+        ctx.drawImage(sprite, cx - sw / 2, cy - sh / 2 + 16, sw, sh);
+        return;
+      } catch { /* fall through to manual drawing */ }
+    }
+
+    // Fallback: manual isometric diamond platform
     const hw = CELL_W / 2 - 4;
     const hh = 22;
     ctx.beginPath();
@@ -309,7 +324,7 @@ export class HexGridRenderer implements IHexGridRenderer {
     ctx.fillStyle = color;
     ctx.fillRect(barX, barY, fill, UPGRADE_BAR_H);
 
-    if (level >= 20) {
+    if (level >= 3) {
       ctx.save();
       ctx.shadowColor = color;
       ctx.shadowBlur = 6;
@@ -325,10 +340,7 @@ export class HexGridRenderer implements IHexGridRenderer {
   }
 
   private _barFill(level: number): number {
-    if (level >= 20) return Math.min(1, (level - 20) / 10);
-    if (level >= 10) return (level - 10) / 10;
-    if (level >= 5)  return (level - 5) / 5;
-    return level / 5;
+    return Math.min(1, (level + 1) / 4);  // 0→0.25, 1→0.5, 2→0.75, 3→1.0
   }
 
   private _drawCatName(
@@ -347,9 +359,9 @@ export class HexGridRenderer implements IHexGridRenderer {
   }
 
   private _tier(level: number): 'basic' | 'improved' | 'modern' | 'premium' {
-    if (level >= 20) return 'premium';
-    if (level >= 10) return 'modern';
-    if (level >= 5)  return 'improved';
+    if (level >= 3) return 'premium';
+    if (level >= 2) return 'modern';
+    if (level >= 1) return 'improved';
     return 'basic';
   }
 }

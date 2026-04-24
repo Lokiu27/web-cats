@@ -155,28 +155,15 @@ export class InputHandlers {
   // ---------------------------------------------------------------------------
 
   /**
-   * Resizes the canvas to fill the window, applying device pixel ratio for
-   * crisp rendering. Uses nearest-neighbor scaling for pixel-art crispness.
+   * Handles window resize. The game uses a fixed 640×480 canvas centred on
+   * the page (see index.html), so no canvas resizing is needed here.
+   * We only ensure nearest-neighbor scaling stays enabled after any browser
+   * context reset (Requirement 21.6).
    */
   private _handleResize(): void {
-    const dpr = window.devicePixelRatio ?? 1;
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-
-    // Set the canvas backing store size
-    this.canvas.width = Math.floor(w * dpr);
-    this.canvas.height = Math.floor(h * dpr);
-
-    // Set the CSS display size
-    this.canvas.style.width = `${w}px`;
-    this.canvas.style.height = `${h}px`;
-
-    // Nearest-neighbor scaling for pixel-art crispness (Requirement 21.6)
     const ctx = this.canvas.getContext('2d');
     if (ctx) {
       ctx.imageSmoothingEnabled = false;
-      // Scale all drawing operations by DPR so logical coordinates stay in CSS pixels
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
   }
 
@@ -339,10 +326,14 @@ export class InputHandlers {
     if (now - this.lastClickTime < CLICK_DEBOUNCE_MS) return;
     this.lastClickTime = now;
 
-    // Convert CSS pixels to canvas logical pixels (accounting for DPR transform)
+    // Convert CSS pixels → logical canvas pixels.
+    // The canvas CSS size may differ from its logical pixel size (640×480),
+    // so we scale the click position proportionally.
     const rect = this.canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
 
     // Convert screen position to hex coordinate
     const coord = this.hexRenderer.screenToHex(x, y);
@@ -370,8 +361,10 @@ export class InputHandlers {
    */
   private _updateHoverHighlight(clientX: number, clientY: number): void {
     const rect = this.canvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     const coord = this.hexRenderer.screenToHex(x, y);
     this.hexRenderer.setHighlighted(coord);
   }

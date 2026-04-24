@@ -8,7 +8,7 @@ export type Expression = 'focused' | 'smiling' | 'serious';
 export type Accessory = 'glasses' | 'tie' | 'bow' | 'none';
 export type Pose = 'upright' | 'leaning';
 
-// DeskTier: basic (levels 0-4), improved (5-9), modern (10-19), premium (20+)
+// DeskTier: basic (level 0), improved (level 1), modern (level 2), premium (level 3)
 export type DeskTier = 'basic' | 'improved' | 'modern' | 'premium';
 
 export type AchievementCategory =
@@ -41,7 +41,8 @@ export type SFXType =
   | 'upgrade'
   | 'error'
   | 'achievement'
-  | 'currency_tick';
+  | 'currency_tick'
+  | 'meow';
 
 export type IconType =
   | 'currency'
@@ -74,6 +75,7 @@ export interface CatAppearance {
 export interface Cat {
   name: string;
   appearance: CatAppearance;
+  biography: string;
 }
 
 export interface Desk {
@@ -182,7 +184,7 @@ export interface UpgradeResult {
   newLevel?: number;
   newGeneration?: number;
   newCurrency?: number;
-  error?: 'insufficient_currency' | 'desk_not_found';
+  error?: 'insufficient_currency' | 'desk_not_found' | 'max_level_reached';
 }
 
 export interface SaveResult {
@@ -275,6 +277,7 @@ export interface ILocalizationSystem {
 export interface ICatAppearanceGenerator {
   generate(): CatAppearance;
   generateName(existingNames: string[], language: 'en' | 'ru'): string;
+  generateBiography(language: 'en' | 'ru'): string;
 }
 
 export interface IPixelArtGenerator {

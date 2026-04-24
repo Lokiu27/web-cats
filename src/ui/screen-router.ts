@@ -37,10 +37,13 @@ const SCREEN_STYLES = `
   font-family: 'Courier New', Courier, monospace;
 }
 
-/* Game screen is transparent — canvas shows through */
+/* Game screen is transparent — canvas shows through.
+   pointer-events: none so clicks reach the canvas underneath;
+   child elements (HUD, modals) re-enable pointer-events on themselves. */
 .screen--game {
   background: transparent;
   overflow: hidden;
+  pointer-events: none !important;
 }
 `;
 
@@ -62,6 +65,8 @@ export class ScreenRouter {
   private currentScreen: ScreenType | null = null;
   private readonly screenElements = new Map<ScreenType, HTMLDivElement>();
   private transitioning = false;
+  /** Incremented on every navigation/showImmediate to cancel stale setTimeout callbacks. */
+  private transitionGeneration = 0;
 
   /**
    * @param container - The DOM element that will hold all screen divs (e.g. #ui-overlay)
@@ -119,8 +124,13 @@ export class ScreenRouter {
 
     // Update currentScreen immediately so renderFrame starts drawing right away
     this.currentScreen = to;
+    this.transitionGeneration++;
+    const gen = this.transitionGeneration;
 
     const doTransition = (): void => {
+      // Abort if a newer navigation or showImmediate has occurred
+      if (this.transitionGeneration !== gen) return;
+
       this.transitioning = true;
 
       // Fade out current screen
@@ -134,6 +144,12 @@ export class ScreenRouter {
       // After fade-out duration, show the new screen
       const FADE_DURATION_MS = 300;
       setTimeout(() => {
+        // Abort if a newer navigation or showImmediate has occurred
+        if (this.transitionGeneration !== gen) {
+          this.transitioning = false;
+          return;
+        }
+
         // Hide all screens (safety measure)
         for (const [, el] of this.screenElements) {
           el.classList.remove('screen--active');
@@ -155,7 +171,10 @@ export class ScreenRouter {
     };
 
     if (this.transitioning) {
-      setTimeout(doTransition, 350);
+      setTimeout(() => {
+        if (this.transitionGeneration !== gen) return;
+        doTransition();
+      }, 350);
     } else {
       doTransition();
     }
@@ -166,6 +185,10 @@ export class ScreenRouter {
    * Useful for the very first screen shown on startup.
    */
   showImmediate(screen: ScreenType): void {
+    // Cancel any pending navigateTo transitions
+    this.transitionGeneration++;
+    this.transitioning = false;
+
     // Hide all
     for (const [, el] of this.screenElements) {
       el.classList.remove('screen--active');
@@ -179,7 +202,7 @@ export class ScreenRouter {
     const from = this.currentScreen;
     this.currentScreen = screen;
 
-    if (from !== null) {
+    if (from !== null && from !== screen) {
       this.bus.emit({ type: 'screen_changed', from, to: screen });
     }
   }
