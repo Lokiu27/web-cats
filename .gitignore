@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# IDE & tools
+.kiro/
+.vscode/
+
+# Docs
+docs/
+
+# macOS
+.DS_Store
+
+# Misc
+0

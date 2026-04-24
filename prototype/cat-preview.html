@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cat Sprite Preview</title>
+<style>
+  body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; font-family: monospace; color: #eee; gap: 20px; }
+  canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+  .label { font-size: 12px; color: #aaa; text-align: center; }
+  .row { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; justify-content: center; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  h2 { color: #f0c040; margin: 8px 0 4px; font-size: 14px; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+<h2>🐱 OPENSPACEMARIN — SPRITE PREVIEW</h2>
+
+<div class="row" id="preview-row"></div>
+<div class="label" id="status">Generating sprites...</div>
+
+<script>
+// ─── COLOR PALETTES ───────────────────────────────────────────────────────────
+const PAL = {
+  // Office floor/desk
+  floor:    ['#3d3d5c', '#4a4a6e', '#5a5a7e', '#2d2d44'],
+  deskWood: ['#8b5e3c', '#a0703a', '#c4894a', '#6b4423', '#d4a060'],
+  deskMetal:['#5a7a8a', '#7a9aaa', '#4a6a7a', '#3a5a6a'],
+  monitor:  ['#1a1a2e', '#2a2a4e', '#4a9eff', '#ffffff', '#0a0a1e'],
+  // Hex tile
+  hexTop:   '#5a7a5a',
+  hexSide:  '#3a5a3a',
+  hexDark:  '#2a4a2a',
+  hexEdge:  '#7aaa7a',
+  // Cat fur colors
+  cats: {
+    orange: ['#e8843a', '#f0a050', '#c86020', '#f8c080', '#d07030'],
+    gray:   ['#8a8a9a', '#aaaabc', '#6a6a7a', '#c0c0d0', '#7a7a8a'],
+    white:  ['#e8e8f0', '#f8f8ff', '#c8c8d8', '#d8d8e8', '#b8b8c8'],
+    black:  ['#2a2a3a', '#3a3a4a', '#1a1a2a', '#4a4a5a', '#5a5a6a'],
+    brown:  ['#7a4a2a', '#9a6a3a', '#5a3a1a', '#ba8a4a', '#8a5a2a'],
+    tabby:  ['#c87830', '#e09840', '#a05820', '#f0b860', '#805020'],
+  },
+  // Accessories
+  glasses:  ['#2a2a2a', '#4a4a4a', '#88ccff'],
+  tie:      ['#cc2244', '#ee4466', '#aa1133'],
+  bow:      ['#cc44aa', '#ee66cc', '#aa2288'],
+  // UI
+  gold:     '#f0c040',
+  green:    '#40c040',
+  blue:     '#4080ff',
+  purple:   '#a040ff',
+  red:      '#ff4040',
+};
+
+// ─── PIXEL DRAWING HELPERS ────────────────────────────────────────────────────
+function createCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+function px(ctx, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, 1, 1);
+}
+
+function rect(ctx, x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+}
+
+function hline(ctx, x, y, w, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, 1);
+}
+
+// ─── HEX TILE (48×32 isometric) ──────────────────────────────────────────────
+function drawHexTile(occupied = false) {
+  const c = createCanvas(48, 32);
+  const ctx = c.getContext('2d');
+
+  // Isometric hex shape — top face
+  const topColor  = occupied ? '#4a6a4a' : '#5a7a5a';
+  const sideColorL = '#3a5a3a';
+  const sideColorR = '#2a4a2a';
+  const edgeColor  = '#7aaa7a';
+
+  // Top diamond face (rows 0-15)
+  for (let row = 0; row < 16; row++) {
+    const half = row < 8 ? row * 3 : (15 - row) * 3;
+    const xStart = 24 - half - (row < 8 ? 0 : 0);
+    const width  = half * 2 + (row < 8 ? 3 : 3);
+    const xS = Math.max(0, 24 - (row < 8 ? row * 3 : (15-row)*3));
+    const xE = Math.min(48, 24 + (row < 8 ? row * 3 + 3 : (15-row)*3 + 3));
+    hline(ctx, xS, row, xE - xS, row === 0 ? edgeColor : topColor);
+  }
+
+  // Left side face (rows 16-31)
+  for (let row = 0; row < 16; row++) {
+    const xStart = row * 1.5 | 0;
+    hline(ctx, xStart, 16 + row, 24 - xStart, sideColorL);
+  }
+
+  // Right side face (rows 16-31)
+  for (let row = 0; row < 16; row++) {
+    const xStart = 24 + (row * 1.5 | 0);
+    hline(ctx, xStart, 16 + row, 48 - xStart, sideColorR);
+  }
+
+  // Edge highlights
+  for (let row = 0; row < 8; row++) {
+    const x = 24 - row * 3;
+    px(ctx, x, row, edgeColor);
+    px(ctx, 48 - x - 1, row, edgeColor);
+  }
+
+  return c;
+}
+
+// ─── DESK SPRITE (32×24) ─────────────────────────────────────────────────────
+function drawDesk(tier = 'basic') {
+  const c = createCanvas(32, 24);
+  const ctx = c.getContext('2d');
+
+  // Desk surface (isometric top)
+  const deskTop  = '#a07040';
+  const deskFront= '#7a5030';
+  const deskSide = '#8a6038';
+  const deskEdge = '#c09050';
+  const legColor = '#5a3820';
+
+  // Top surface
+  for (let row = 0; row < 8; row++) {
+    const xS = 4 + (row < 4 ? row : 7 - row);
+    const xE = 28 - (row < 4 ? row : 7 - row);
+    hline(ctx, xS, row, xE - xS, row === 0 ? deskEdge : deskTop);
+  }
+
+  // Front face
+  rect(ctx, 4, 8, 24, 8, deskFront);
+  // Highlight edge
+  hline(ctx, 4, 8, 24, '#c09050');
+  // Side face
+  for (let row = 0; row < 8; row++) {
+    hline(ctx, 28, 8 + row, 4, deskSide);
+  }
+
+  // Legs
+  rect(ctx, 5,  16, 2, 6, legColor);
+  rect(ctx, 25, 16, 2, 6, legColor);
+
+  // Monitor (improved+)
+  if (tier !== 'basic') {
+    // Monitor stand
+    rect(ctx, 14, 4, 4, 1, '#3a3a4a');
+    // Monitor screen
+    rect(ctx, 10, 0, 12, 5, '#1a1a2e');
+    rect(ctx, 11, 1, 10, 3, '#2a4a8a');
+    // Screen glow
+    rect(ctx, 12, 1, 8, 1, '#4a9eff');
+    px(ctx, 12, 2, '#88ccff');
+    px(ctx, 13, 2, '#88ccff');
+  }
+
+  // Second monitor (modern+)
+  if (tier === 'modern' || tier === 'premium') {
+    rect(ctx, 2, 1, 8, 4, '#1a1a2e');
+    rect(ctx, 3, 2, 6, 2, '#2a6a3a');
+    rect(ctx, 3, 2, 4, 1, '#4aaa4a');
+  }
+
+  // Glow effect (premium)
+  if (tier === 'premium') {
+    ctx.globalAlpha = 0.3;
+    const grad = ctx.createRadialGradient(16, 4, 0, 16, 4, 14);
+    grad.addColorStop(0, '#f0c040');
+    grad.addColorStop(1, 'transparent');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 32, 24);
+    ctx.globalAlpha = 1.0;
+  }
+
+  return c;
+}
+
+// ─── CAT SPRITE (24×28) ──────────────────────────────────────────────────────
+function drawCat(furColor = 'orange', expression = 'focused', accessory = 'none', pose = 'upright', frame = 0) {
+  const c = createCanvas(24, 28);
+  const ctx = c.getContext('2d');
+
+  const pal = PAL.cats[furColor] || PAL.cats.orange;
+  const [main, light, dark, highlight, mid] = pal;
+
+  // Body sway for idle animation
+  const sway = (pose === 'upright' && frame === 1) ? -1 : 0;
+  const lean = (pose === 'leaning') ? 2 : 0;
+
+  // ── BODY ──
+  // Torso
+  rect(ctx, 7 + sway, 14 + lean, 10, 10, main);
+  rect(ctx, 8 + sway, 13 + lean, 8, 1, light);
+  // Belly highlight
+  rect(ctx, 9 + sway, 16 + lean, 6, 6, light);
+  // Body outline
+  hline(ctx, 7 + sway, 23 + lean, 10, dark);
+
+  // ── ARMS ──
+  if (pose === 'leaning') {
+    // Arms on desk
+    rect(ctx, 4, 20, 5, 3, main);
+    rect(ctx, 15, 20, 5, 3, main);
+    // Paws
+    rect(ctx, 3, 22, 4, 2, light);
+    rect(ctx, 17, 22, 4, 2, light);
+  } else {
+    // Arms at sides
+    rect(ctx, 5 + sway, 16, 3, 6, main);
+    rect(ctx, 16 + sway, 16, 3, 6, main);
+    // Paws
+    rect(ctx, 4 + sway, 21, 4, 3, light);
+    rect(ctx, 16 + sway, 21, 4, 3, light);
+  }
+
+  // ── HEAD ──
+  const headY = 2 + sway * 0 + (frame === 1 ? 1 : 0);
+  const headX = 5 + sway + lean;
+
+  // Head base
+  rect(ctx, headX, headY, 14, 12, main);
+  // Head top rounded
+  hline(ctx, headX + 1, headY - 1, 12, main);
+  hline(ctx, headX + 2, headY - 2, 10, light);
+
+  // Cheeks
+  rect(ctx, headX, headY + 4, 3, 4, light);
+  rect(ctx, headX + 11, headY + 4, 3, 4, light);
+
+  // ── EARS ──
+  // Left ear
+  px(ctx, headX + 1, headY - 3, main);
+  px(ctx, headX + 2, headY - 4, main);
+  px(ctx, headX + 3, headY - 4, main);
+  px(ctx, headX + 2, headY - 3, light);
+  // Right ear
+  px(ctx, headX + 12, headY - 3, main);
+  px(ctx, headX + 11, headY - 4, main);
+  px(ctx, headX + 10, headY - 4, main);
+  px(ctx, headX + 11, headY - 3, light);
+
+  // Inner ear
+  px(ctx, headX + 2, headY - 3, '#ffaaaa');
+  px(ctx, headX + 11, headY - 3, '#ffaaaa');
+
+  // ── FACE ──
+  const eyeY = headY + 4;
+  const eyeX1 = headX + 2;
+  const eyeX2 = headX + 9;
+
+  if (expression === 'focused') {
+    // Focused eyes — slightly squinted
+    rect(ctx, eyeX1, eyeY, 3, 2, '#1a1a2a');
+    rect(ctx, eyeX2, eyeY, 3, 2, '#1a1a2a');
+    px(ctx, eyeX1 + 1, eyeY, '#4488ff');
+    px(ctx, eyeX2 + 1, eyeY, '#4488ff');
+    // Eyebrow
+    hline(ctx, eyeX1, eyeY - 1, 3, dark);
+    hline(ctx, eyeX2, eyeY - 1, 3, dark);
+    // Mouth — straight
+    hline(ctx, headX + 5, headY + 8, 4, dark);
+  } else if (expression === 'smiling') {
+    // Happy eyes — curved
+    px(ctx, eyeX1, eyeY, '#1a1a2a');
+    px(ctx, eyeX1 + 1, eyeY - 1, '#1a1a2a');
+    px(ctx, eyeX1 + 2, eyeY, '#1a1a2a');
+    px(ctx, eyeX2, eyeY, '#1a1a2a');
+    px(ctx, eyeX2 + 1, eyeY - 1, '#1a1a2a');
+    px(ctx, eyeX2 + 2, eyeY, '#1a1a2a');
+    // Blush
+    px(ctx, eyeX1 - 1, eyeY + 2, '#ffaaaa');
+    px(ctx, eyeX2 + 3, eyeY + 2, '#ffaaaa');
+    // Smile
+    px(ctx, headX + 5, headY + 8, dark);
+    px(ctx, headX + 6, headY + 9, dark);
+    px(ctx, headX + 7, headY + 9, dark);
+    px(ctx, headX + 8, headY + 8, dark);
+  } else { // serious
+    // Serious eyes — flat
+    rect(ctx, eyeX1, eyeY, 3, 3, '#1a1a2a');
+    rect(ctx, eyeX2, eyeY, 3, 3, '#1a1a2a');
+    px(ctx, eyeX1 + 1, eyeY + 1, '#88aaff');
+    px(ctx, eyeX2 + 1, eyeY + 1, '#88aaff');
+    // Stern brow
+    hline(ctx, eyeX1 - 1, eyeY - 1, 4, dark);
+    hline(ctx, eyeX2 - 1, eyeY - 1, 4, dark);
+    // Flat mouth
+    hline(ctx, headX + 5, headY + 8, 4, dark);
+    px(ctx, headX + 4, headY + 8, dark);
+  }
+
+  // Nose
+  px(ctx, headX + 6, headY + 6, '#ff8888');
+  px(ctx, headX + 7, headY + 6, '#ff8888');
+
+  // Whiskers
+  hline(ctx, headX - 2, headY + 6, 4, '#cccccc');
+  hline(ctx, headX + 12, headY + 6, 4, '#cccccc');
+  hline(ctx, headX - 2, headY + 7, 3, '#cccccc');
+  hline(ctx, headX + 13, headY + 7, 3, '#cccccc');
+
+  // ── ACCESSORIES ──
+  if (accessory === 'glasses') {
+    // Glasses frames
+    rect(ctx, eyeX1 - 1, eyeY - 1, 5, 4, 'transparent');
+    // Left lens outline
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(eyeX1 - 1, eyeY - 1, 5, 4);
+    // Right lens outline
+    ctx.strokeRect(eyeX2 - 1, eyeY - 1, 5, 4);
+    // Bridge
+    hline(ctx, eyeX1 + 4, eyeY + 1, eyeX2 - eyeX1 - 4, '#2a2a2a');
+    // Lens tint
+    ctx.globalAlpha = 0.2;
+    rect(ctx, eyeX1, eyeY, 3, 2, '#88ccff');
+    rect(ctx, eyeX2, eyeY, 3, 2, '#88ccff');
+    ctx.globalAlpha = 1.0;
+  } else if (accessory === 'tie') {
+    // Tie
+    rect(ctx, 10 + sway, 13 + lean, 4, 2, '#cc2244');
+    rect(ctx, 11 + sway, 15 + lean, 2, 5, '#cc2244');
+    px(ctx, 11 + sway, 19 + lean, '#ee4466');
+    px(ctx, 12 + sway, 19 + lean, '#ee4466');
+    // Tie knot
+    rect(ctx, 10 + sway, 13 + lean, 4, 2, '#ee4466');
+  } else if (accessory === 'bow') {
+    // Bow tie
+    rect(ctx, 8 + sway, 13 + lean, 3, 2, '#cc44aa');
+    rect(ctx, 13 + sway, 13 + lean, 3, 2, '#cc44aa');
+    px(ctx, 11 + sway, 14 + lean, '#ee66cc');
+    px(ctx, 12 + sway, 14 + lean, '#ee66cc');
+  }
+
+  return c;
+}
+
+// ─── UPGRADE BAR (32×4) ──────────────────────────────────────────────────────
+function drawUpgradeBar(level, maxDisplay = 20) {
+  const c = createCanvas(32, 4);
+  const ctx = c.getContext('2d');
+
+  const colors = {
+    0: '#40c040',   // green
+    5: '#4080ff',   // blue
+    10: '#a040ff',  // purple
+    20: '#f0c040',  // gold
+  };
+
+  let barColor = '#40c040';
+  if (level >= 20) barColor = '#f0c040';
+  else if (level >= 10) barColor = '#a040ff';
+  else if (level >= 5) barColor = '#4080ff';
+
+  // Background
+  rect(ctx, 0, 0, 32, 4, '#1a1a2e');
+  // Border
+  ctx.strokeStyle = '#3a3a5a';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(0, 0, 32, 4);
+
+  // Fill
+  const fill = Math.min(30, Math.round((level % 5) / 5 * 30));
+  rect(ctx, 1, 1, fill, 2, barColor);
+
+  // Glow for high levels
+  if (level >= 20) {
+    ctx.globalAlpha = 0.5;
+    rect(ctx, 1, 1, fill, 1, '#ffffff');
+    ctx.globalAlpha = 1.0;
+  }
+
+  return c;
+}
+
+// ─── COIN ICON (12×12) ───────────────────────────────────────────────────────
+function drawCoin() {
+  const c = createCanvas(12, 12);
+  const ctx = c.getContext('2d');
+  const cx = 6, cy = 6, r = 5;
+
+  // Circle
+  for (let y = 0; y < 12; y++) {
+    for (let x = 0; x < 12; x++) {
+      const dx = x - cx, dy = y - cy;
+      if (dx*dx + dy*dy <= r*r) {
+        const edge = dx*dx + dy*dy > (r-1)*(r-1);
+        ctx.fillStyle = edge ? '#c08020' : (dy < 0 ? '#f0d040' : '#d0a030');
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+  }
+  // $ symbol
+  rect(ctx, 5, 3, 2, 6, '#8a5010');
+  rect(ctx, 4, 4, 4, 1, '#8a5010');
+  rect(ctx, 4, 6, 4, 1, '#8a5010');
+  rect(ctx, 4, 8, 4, 1, '#8a5010');
+
+  return c;
+}
+
+// ─── COMPOSE SCENE ────────────────────────────────────────────────────────────
+function drawScene(furColor, expression, accessory, pose, deskTier, frame) {
+  const SCALE = 4;
+  const W = 64, H = 72;
+  const c = createCanvas(W * SCALE, H * SCALE);
+  const ctx = c.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  // Work on a small canvas, then scale up
+  const small = createCanvas(W, H);
+  const s = small.getContext('2d');
+
+  // Background — office wall
+  rect(s, 0, 0, W, H, '#2a2a4a');
+  // Floor
+  rect(s, 0, 48, W, H - 48, '#3a3a5a');
+  // Wall baseboard
+  hline(s, 0, 47, W, '#4a4a6a');
+  // Simple wall pattern
+  for (let x = 0; x < W; x += 16) {
+    s.fillStyle = '#2e2e50';
+    s.fillRect(x, 0, 1, 48);
+  }
+  for (let y = 0; y < 48; y += 16) {
+    s.fillStyle = '#2e2e50';
+    s.fillRect(0, y, W, 1);
+  }
+
+  // Hex tile
+  const hex = drawHexTile(true);
+  s.drawImage(hex, 8, 36);
+
+  // Desk
+  const desk = drawDesk(deskTier);
+  s.drawImage(desk, 16, 28);
+
+  // Upgrade bar
+  const level = deskTier === 'basic' ? 2 : deskTier === 'improved' ? 7 : deskTier === 'modern' ? 15 : 25;
+  const bar = drawUpgradeBar(level);
+  s.drawImage(bar, 16, 24);
+
+  // Cat
+  const cat = drawCat(furColor, expression, accessory, pose, frame);
+  s.drawImage(cat, 20, 4);
+
+  // Coin icon
+  const coin = drawCoin();
+  s.drawImage(coin, 2, 2);
+  s.fillStyle = '#f0c040';
+  s.font = '5px monospace';
+  s.fillText('+1', 15, 10);
+
+  // Scale up with nearest-neighbor
+  ctx.drawImage(small, 0, 0, W * SCALE, H * SCALE);
+
+  c.style.width = (W * SCALE) + 'px';
+  c.style.height = (H * SCALE) + 'px';
+  return c;
+}
+
+// ─── RENDER PREVIEW ──────────────────────────────────────────────────────────
+const configs = [
+  { fur: 'orange', expr: 'focused',  acc: 'glasses', pose: 'upright',  tier: 'basic',    label: 'Orange\nGlasses\nBasic desk' },
+  { fur: 'gray',   expr: 'smiling',  acc: 'tie',     pose: 'leaning',  tier: 'improved', label: 'Gray\nTie\nImproved desk' },
+  { fur: 'white',  expr: 'serious',  acc: 'none',    pose: 'upright',  tier: 'modern',   label: 'White\nNo acc\nModern desk' },
+  { fur: 'black',  expr: 'smiling',  acc: 'bow',     pose: 'leaning',  tier: 'premium',  label: 'Black\nBow\nPremium desk' },
+  { fur: 'tabby',  expr: 'focused',  acc: 'tie',     pose: 'upright',  tier: 'improved', label: 'Tabby\nTie\nImproved desk' },
+  { fur: 'brown',  expr: 'serious',  acc: 'glasses', pose: 'leaning',  tier: 'modern',   label: 'Brown\nGlasses\nModern desk' },
+];
+
+const row = document.getElementById('preview-row');
+
+configs.forEach(cfg => {
+  const cell = document.createElement('div');
+  cell.className = 'cell';
+
+  const canvas = drawScene(cfg.fur, cfg.expr, cfg.acc, cfg.pose, cfg.tier, 0);
+  cell.appendChild(canvas);
+
+  const lbl = document.createElement('div');
+  lbl.className = 'label';
+  lbl.style.whiteSpace = 'pre';
+  lbl.textContent = cfg.label;
+  cell.appendChild(lbl);
+
+  row.appendChild(cell);
+});
+
+// Animate idle frames
+let frame = 0;
+setInterval(() => {
+  frame = (frame + 1) % 2;
+  row.innerHTML = '';
+  configs.forEach(cfg => {
+    const cell = document.createElement('div');
+    cell.className = 'cell';
+    const canvas = drawScene(cfg.fur, cfg.expr, cfg.acc, cfg.pose, cfg.tier, frame);
+    cell.appendChild(canvas);
+    const lbl = document.createElement('div');
+    lbl.className = 'label';
+    lbl.style.whiteSpace = 'pre';
+    lbl.textContent = cfg.label;
+    cell.appendChild(lbl);
+    row.appendChild(cell);
+  });
+}, 600);
+
+document.getElementById('status').textContent = '6 cats × 4 desk tiers — all generated programmatically, zero external files';
+</script>
+</body>
+</html>

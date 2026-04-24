@@ -1,0 +1,14 @@
+// Economy constants for Openspacemarin
+// Requirements: 24.1–24.6
+
+export const ECONOMY = {
+  BASE_CURRENCY_PER_TICK: 1,
+  UPGRADE_BONUS_RATE: 0.25,
+  BASE_DESK_COST: 100,
+  DESK_COST_GROWTH_RATE: 0.15,
+  BASE_UPGRADE_COST: 50,
+  UPGRADE_COST_GROWTH_RATE: 0.2,
+  STARTING_DESKS: 3,
+  STARTING_CURRENCY: 150,
+  AUTO_SAVE_INTERVAL_TICKS: 60,
+} as const;
