@@ -3,10 +3,12 @@ node_modules/
 
 # Build output
 dist/
+scripts/
 
 # IDE & tools
 .kiro/
 .vscode/
+.venv/
 
 # Docs
 docs/

@@ -256,14 +256,7 @@ export class HexGridRenderer implements IHexGridRenderer {
         const dw = CELL_W * 0.9;
         const dh = ds.height * (dw / ds.width);
         ctx.drawImage(ds, cx - dw / 2, cy - dh / 2 + 18, dw, dh);
-        if (tier === 'premium' || tier === 'modern') {
-          const glow = this.pixelArt.generateDeskGlow(tier);
-          ctx.save();
-          ctx.globalAlpha = 0.35;
-          ctx.globalCompositeOperation = 'lighter';
-          ctx.drawImage(glow, cx - dw / 2, cy - dh / 2 + 18, dw, dh);
-          ctx.restore();
-        }
+
       } catch { drawFallbackDesk(ctx, cx, cy, desk.upgradeLevel); }
     } else {
       drawFallbackCat(ctx, cx, cy);

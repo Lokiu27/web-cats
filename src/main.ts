@@ -484,7 +484,9 @@ function wireAllCallbacks(): void {
     const state = stateManager.getState();
     const desk = state.desks.find(d => d.hexCoord.q === coord.q && d.hexCoord.r === coord.r);
     if (!desk) return;
-    upgradeModal.show(desk, economy.getUpgradeCost(desk.upgradeLevel), state.currency, economy.getDeskGeneration(desk.upgradeLevel), economy.getDeskGeneration(desk.upgradeLevel + 1), hexRenderer.getPixelArt() ?? pixelArt);
+    const renderer = hexRenderer.getPixelArt();
+    console.log('[Modal] renderer type:', renderer?.constructor.name, 'fallback:', renderer === null ? 'using pixelArt' : 'using hexRenderer');
+    upgradeModal.show(desk, economy.getUpgradeCost(desk.upgradeLevel), state.currency, economy.getDeskGeneration(desk.upgradeLevel), economy.getDeskGeneration(desk.upgradeLevel + 1), renderer ?? pixelArt);
     audioSystem.playSFX('window_open');
   };
   inputHandlers.onScroll = () => {};

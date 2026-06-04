@@ -335,19 +335,50 @@ export class InputHandlers {
     const x = (clientX - rect.left) * scaleX;
     const y = (clientY - rect.top) * scaleY;
 
-    // Convert screen position to hex coordinate
+    // DEBUG: remove after fixing click issues
     const coord = this.hexRenderer.screenToHex(x, y);
+    const key = coord ? `${coord.q},${coord.r}` : null;
+    console.log('[Click]', { logical: [Math.round(x), Math.round(y)], rect: [Math.round(rect.width), Math.round(rect.height)], coord, key, isOccupied: key ? this.occupiedCoords.has(key) : false, occupiedKeys: [...this.occupiedCoords] });
 
     if (coord === null) {
       this.onCanvasClick();
       return;
     }
 
-    const key = `${coord.q},${coord.r}`;
-    if (this.occupiedCoords.has(key)) {
+    if (this.occupiedCoords.has(key!)) {
       this.onOccupiedHexClick(coord);
     } else {
-      this.onEmptyHexClick(coord);
+      // Check neighboring hexes — cat sprites extend beyond their cell center,
+      // so a click near a desk might land on an adjacent empty cell.
+      const neighbors = [
+        { q: coord.q - 1, r: coord.r },
+        { q: coord.q + 1, r: coord.r },
+        { q: coord.q, r: coord.r - 1 },
+        { q: coord.q, r: coord.r + 1 },
+        { q: coord.q - 1, r: coord.r - 1 },
+        { q: coord.q - 1, r: coord.r + 1 },
+        { q: coord.q + 1, r: coord.r - 1 },
+        { q: coord.q + 1, r: coord.r + 1 },
+      ];
+      let found = false;
+      for (const n of neighbors) {
+        const nKey = `${n.q},${n.r}`;
+        if (this.occupiedCoords.has(nKey)) {
+          // Check if the click is close enough to this neighbor's screen position
+          const nScreen = this.hexRenderer.hexToScreen(n);
+          const dx = x - nScreen.x;
+          const dy = y - nScreen.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < 70) { // within ~70px of a desk center
+            this.onOccupiedHexClick(n);
+            found = true;
+            break;
+          }
+        }
+      }
+      if (!found) {
+        this.onEmptyHexClick(coord);
+      }
     }
   }
 

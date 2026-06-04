@@ -87,7 +87,7 @@ const UPGRADE_MODAL_STYLES = `
   image-rendering: crisp-edges;
   border: 1px solid #222244;
   border-radius: 2px;
-  background: #0a0a14;
+  background: transparent;
 }
 
 .upgrade-modal__speech-bubble {
@@ -593,6 +593,11 @@ export class UpgradeModal {
 
     ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     ctx.imageSmoothingEnabled = false;
+
+    // Fill with modal background color so semi-transparent sprite edges
+    // blend correctly (instead of blending with default black canvas)
+    ctx.fillStyle = '#0d0d1a';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
     const tier = levelToTier(desk.upgradeLevel);
     const cx = CANVAS_WIDTH / 2;
