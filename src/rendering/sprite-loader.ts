@@ -74,7 +74,8 @@ export class SpriteLoader {
   private readonly basePath: string;
 
   constructor(basePath?: string) {
-    this.basePath = basePath ?? '/sprites/';
+    const base = import.meta.env.BASE_URL ?? '/';
+    this.basePath = basePath ?? `${base}sprites/`;
   }
 
   // -------------------------------------------------------------------------
