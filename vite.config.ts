@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+  base: '/web-cats/',
   test: {
     environment: 'jsdom',
     globals: true,
